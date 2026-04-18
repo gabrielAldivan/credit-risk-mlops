@@ -34,7 +34,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
 
       - name: Download dataset
         run: python data/download.py
@@ -42,13 +41,18 @@ jobs:
       - name: Run preprocessing
         run: python src/preprocess.py
 
-      - name: Run tests
-        run: pytest tests/ -v --cov=src --cov-report=term-missing
+      - name: Run unit tests
+        run: pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=70
 
-      - name: Train models (offline — no MLflow server)
+      - name: Train models (offline — file-based MLflow)
         env:
           MLFLOW_TRACKING_URI: "file:./mlruns"
         run: python src/train.py
+
+      - name: Run evaluation + SHAP
+        env:
+          MLFLOW_TRACKING_URI: "file:./mlruns"
+        run: python src/evaluate.py
 
   lint:
     runs-on: ubuntu-latest
@@ -56,10 +60,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - name: Install linters
         run: pip install flake8 black
       - name: Black format check
         run: black --check src/
       - name: Flake8
-        run: flake8 src/ --max-line-length=100 --ignore=E203,W503
+        run: flake8 src/ --max-line-length=100 --ignore=E203,W503,E731
