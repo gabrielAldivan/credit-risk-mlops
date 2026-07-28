@@ -44,7 +44,8 @@ def make_preprocessed_data(
     )
     y_train = pd.Series(rng.integers(0, 2, n_train))
     y_test = pd.Series(rng.integers(0, 2, n_test))
-    return X_train, X_test, y_train, y_test
+    # Match train.py function signature order: (X_train, y_train, X_test, y_test)
+    return X_train, y_train, X_test, y_test
 
 
 # ── compute_metrics ───────────────────────────────────────────────────────────

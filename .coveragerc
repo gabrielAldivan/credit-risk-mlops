@@ -1,0 +1,14 @@
+[run]
+# evaluate.py is a reporting/visualization layer (matplotlib + SHAP artifacts to
+# disk) — validated by producing artifacts, not by unit tests. Excluding it keeps
+# the coverage metric focused on business logic (preprocess, train, serve, monitor).
+omit =
+    */evaluate.py
+    */__init__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    logger.debug

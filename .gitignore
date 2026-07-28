@@ -24,3 +24,5 @@ mlruns/
 .DS_Store
 Thumbs.db
 *_executed.ipynb
+.coverage
+mlruns/
