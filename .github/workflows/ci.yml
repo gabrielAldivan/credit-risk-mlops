@@ -66,4 +66,7 @@ jobs:
       - name: Black format check
         run: black --check src/
       - name: Flake8
-        run: flake8 src/ --max-line-length=100 --ignore=E203,W503,E731
+        # E203,W503,E731: conflitam com o Black (formatter é a fonte da verdade)
+        # E402: padrão matplotlib.use("Agg") exige import após chamada (headless CI)
+        # E226: espaçamento em operador aritmético — estilístico, não forçado pelo Black
+        run: flake8 src/ --max-line-length=100 --ignore=E203,W503,E731,E402,E226

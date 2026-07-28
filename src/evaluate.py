@@ -8,10 +8,12 @@ Artifacts produced:
   - shap_feature_importance.png  (bar chart — top-15 mean |SHAP|)
   - shap_waterfall_sample_<N>.png  (per-applicant explanation, high-risk + low-risk)
 """
+
 import os
 import sys
 import matplotlib
-matplotlib.use("Agg")   # headless — no display needed in CI or Docker
+
+matplotlib.use("Agg")  # headless — no display needed in CI or Docker
 
 import mlflow
 import mlflow.pyfunc
@@ -21,8 +23,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import shap
 from sklearn.metrics import (
-    classification_report, roc_auc_score,
-    roc_curve, precision_recall_curve,
+    classification_report,
+    roc_auc_score,
+    precision_recall_curve,
 )
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
@@ -32,6 +35,7 @@ MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
+
 def load_test_data():
     X_test = pd.read_parquet(os.path.join(PROCESSED_DIR, "X_test.parquet"))
     y_test = pd.read_parquet(os.path.join(PROCESSED_DIR, "y_test.parquet")).squeeze()
@@ -40,7 +44,10 @@ def load_test_data():
 
 # ── Model loading ─────────────────────────────────────────────────────────────
 
-def load_production_model(model_name: str = "credit-risk-XGBoost", stage: str = "latest"):
+
+def load_production_model(
+    model_name: str = "credit-risk-XGBoost", stage: str = "latest"
+):
     """Load pyfunc wrapper from MLflow registry (used for predict/predict_proba)."""
     mlflow.set_tracking_uri(MLFLOW_URI)
     model_uri = f"models:/{model_name}/{stage}"
@@ -56,6 +63,7 @@ def load_xgboost_native(model_name: str = "credit-risk-XGBoost", stage: str = "l
 
 
 # ── Standard evaluation plots ─────────────────────────────────────────────────
+
 
 def plot_precision_recall(y_true, y_proba, save_dir: str) -> str:
     precision, recall, _ = precision_recall_curve(y_true, y_proba)
@@ -74,7 +82,10 @@ def plot_precision_recall(y_true, y_proba, save_dir: str) -> str:
 
 # ── SHAP explainability ───────────────────────────────────────────────────────
 
-def plot_shap_summary(shap_values: np.ndarray, X_test: pd.DataFrame, save_dir: str) -> str:
+
+def plot_shap_summary(
+    shap_values: np.ndarray, X_test: pd.DataFrame, save_dir: str
+) -> str:
     """
     Beeswarm plot — shows each feature's impact on every prediction.
     Red = high feature value pushes toward bad credit; blue = low value.
@@ -168,12 +179,24 @@ def run_shap_analysis(
     low_risk_idx = int(np.argmin(proba))
 
     paths.append(
-        plot_shap_waterfall(shap_values, explainer.expected_value,
-                            X_test, high_risk_idx, save_dir, label="high_risk")
+        plot_shap_waterfall(
+            shap_values,
+            explainer.expected_value,
+            X_test,
+            high_risk_idx,
+            save_dir,
+            label="high_risk",
+        )
     )
     paths.append(
-        plot_shap_waterfall(shap_values, explainer.expected_value,
-                            X_test, low_risk_idx, save_dir, label="low_risk")
+        plot_shap_waterfall(
+            shap_values,
+            explainer.expected_value,
+            X_test,
+            low_risk_idx,
+            save_dir,
+            label="low_risk",
+        )
     )
 
     if log_to_mlflow:
@@ -185,6 +208,7 @@ def run_shap_analysis(
 
 
 # ── Main entrypoint ───────────────────────────────────────────────────────────
+
 
 def run():
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
@@ -202,13 +226,20 @@ def run():
         print(f"MLflow unavailable ({exc}). Training fresh model for evaluation.")
         sys.path.insert(0, os.path.dirname(__file__))
         from train import train_xgboost, load_data  # noqa: PLC0415
+
         X_train, _, y_train, _ = load_data()
-        xgb_model, _, y_pred, y_proba, _ = train_xgboost(X_train, y_train, X_test, y_test)
+        xgb_model, _, y_pred, y_proba, _ = train_xgboost(
+            X_train, y_train, X_test, y_test
+        )
 
     print("\n" + "=" * 60)
     print("CLASSIFICATION REPORT")
     print("=" * 60)
-    print(classification_report(y_test, y_pred, target_names=["Good Credit", "Bad Credit"]))
+    print(
+        classification_report(
+            y_test, y_pred, target_names=["Good Credit", "Bad Credit"]
+        )
+    )
     print(f"ROC-AUC: {roc_auc_score(y_test, y_proba):.4f}")
 
     plot_precision_recall(y_test, y_proba, ARTIFACTS_DIR)

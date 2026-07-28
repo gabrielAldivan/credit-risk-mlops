@@ -9,19 +9,23 @@ a current production window to detect:
 
 Outputs an HTML report and raises an alert if drift exceeds threshold.
 """
+
 import os
-import json
 from datetime import datetime
 
 import pandas as pd
 import numpy as np
 from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset, DataQualityPreset, TargetDriftPreset
+from evidently.metric_preset import (
+    DataDriftPreset,
+    DataQualityPreset,
+    TargetDriftPreset,
+)
 from evidently.metrics import DatasetDriftMetric
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "..", "reports")
-DRIFT_THRESHOLD = 0.3   # fraction of drifted features to trigger alert
+DRIFT_THRESHOLD = 0.3  # fraction of drifted features to trigger alert
 
 
 def load_reference() -> pd.DataFrame:
@@ -33,7 +37,9 @@ def load_reference() -> pd.DataFrame:
     return ref
 
 
-def simulate_production_data(reference: pd.DataFrame, drift: bool = False) -> pd.DataFrame:
+def simulate_production_data(
+    reference: pd.DataFrame, drift: bool = False
+) -> pd.DataFrame:
     """
     Simulate a production batch.
     When drift=True, injects distribution shifts to test monitoring.
@@ -49,7 +55,9 @@ def simulate_production_data(reference: pd.DataFrame, drift: bool = False) -> pd
             current[col] = current[col] + np.random.normal(1.5, 0.5, n)
         print("[SIMULATION] Drift injected into production batch.")
     else:
-        print("[SIMULATION] No drift injected — production batch mirrors training distribution.")
+        print(
+            "[SIMULATION] No drift injected — production batch mirrors training distribution."
+        )
 
     return current
 
@@ -58,12 +66,14 @@ def run_drift_report(reference: pd.DataFrame, current: pd.DataFrame) -> dict:
     """Generate Evidently drift report and return summary dict."""
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    report = Report(metrics=[
-        DataDriftPreset(),
-        DataQualityPreset(),
-        TargetDriftPreset(),
-        DatasetDriftMetric(),
-    ])
+    report = Report(
+        metrics=[
+            DataDriftPreset(),
+            DataQualityPreset(),
+            TargetDriftPreset(),
+            DatasetDriftMetric(),
+        ]
+    )
 
     report.run(reference_data=reference, current_data=current)
 
@@ -122,11 +132,13 @@ def run(inject_drift: bool = False):
     result, html_path = run_drift_report(reference, current)
 
     summary = parse_drift_summary(result)
-    print(f"\nDrift Summary:")
+    print("\nDrift Summary:")
     for k, v in summary.items():
         print(f"  {k}: {v}")
 
-    if summary.get("drift_share", 0) > DRIFT_THRESHOLD or summary.get("dataset_drift_detected"):
+    if summary.get("drift_share", 0) > DRIFT_THRESHOLD or summary.get(
+        "dataset_drift_detected"
+    ):
         send_alert(summary)
     else:
         print("\n[OK] No significant drift detected. Model remains stable.")
@@ -134,8 +146,12 @@ def run(inject_drift: bool = False):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inject-drift", action="store_true",
-                        help="Inject artificial drift for testing")
+    parser.add_argument(
+        "--inject-drift",
+        action="store_true",
+        help="Inject artificial drift for testing",
+    )
     args = parser.parse_args()
     run(inject_drift=args.inject_drift)

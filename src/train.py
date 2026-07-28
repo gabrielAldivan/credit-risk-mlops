@@ -13,21 +13,26 @@ Usage:
   python src/train.py --tune       # Optuna search, 50 trials (slower, better AUC)
   python src/train.py --tune --trials 100
 """
+
 import os
 import argparse
-import joblib
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
 import pandas as pd
-import numpy as np
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    roc_auc_score, f1_score, precision_score,
-    recall_score, log_loss, confusion_matrix, roc_curve,
+    roc_auc_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    log_loss,
+    confusion_matrix,
+    roc_curve,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier
@@ -77,9 +82,12 @@ def plot_confusion_matrix(y_true, y_pred, model_name: str, save_dir: str):
     fig, ax = plt.subplots(figsize=(5, 4))
     im = ax.imshow(cm, cmap="Blues")
     fig.colorbar(im)
-    ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
-    ax.set_xticklabels(["Good", "Bad"]); ax.set_yticklabels(["Good", "Bad"])
-    ax.set_xlabel("Predicted"); ax.set_ylabel("Actual")
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(["Good", "Bad"])
+    ax.set_yticklabels(["Good", "Bad"])
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
     ax.set_title(f"Confusion Matrix — {model_name}")
     for i in range(2):
         for j in range(2):
@@ -131,6 +139,7 @@ def train_xgboost(X_train, y_train, X_test, y_test):
 
 # ── Optuna hyperparameter search ──────────────────────────────────────────────
 
+
 def tune_xgboost(X_train: pd.DataFrame, y_train: pd.Series, n_trials: int = 50) -> dict:
     """
     Bayesian hyperparameter search with Optuna (TPE sampler).
@@ -142,6 +151,7 @@ def tune_xgboost(X_train: pd.DataFrame, y_train: pd.Series, n_trials: int = 50) 
     Returns the best params dict ready to pass to XGBClassifier.
     """
     import optuna  # noqa: PLC0415 — lazy import keeps startup fast when not tuning
+
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     neg = int((y_train == 0).sum())
@@ -164,8 +174,9 @@ def tune_xgboost(X_train: pd.DataFrame, y_train: pd.Series, n_trials: int = 50) 
             "n_jobs": -1,
         }
         model = XGBClassifier(**params)
-        scores = cross_val_score(model, X_train, y_train, cv=cv,
-                                 scoring="roc_auc", n_jobs=-1)
+        scores = cross_val_score(
+            model, X_train, y_train, cv=cv, scoring="roc_auc", n_jobs=-1
+        )
         return scores.mean()
 
     study = optuna.create_study(
@@ -175,11 +186,13 @@ def tune_xgboost(X_train: pd.DataFrame, y_train: pd.Series, n_trials: int = 50) 
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
     best = study.best_params
-    best.update({
-        "scale_pos_weight": neg / pos,
-        "eval_metric": "logloss",
-        "random_state": 42,
-    })
+    best.update(
+        {
+            "scale_pos_weight": neg / pos,
+            "eval_metric": "logloss",
+            "random_state": 42,
+        }
+    )
 
     print(f"\nOptuna finished — best CV ROC-AUC: {study.best_value:.4f}")
     print("Best hyperparameters:")
@@ -207,7 +220,9 @@ def run_experiment(model_name: str, train_fn, X_train, y_train, X_test, y_test):
     mlflow.set_experiment(EXPERIMENT_NAME)
 
     with mlflow.start_run(run_name=model_name):
-        model, metrics, y_pred, y_proba, params = train_fn(X_train, y_train, X_test, y_test)
+        model, metrics, y_pred, y_proba, params = train_fn(
+            X_train, y_train, X_test, y_test
+        )
 
         # Log parameters
         mlflow.log_params(params)
@@ -223,11 +238,17 @@ def run_experiment(model_name: str, train_fn, X_train, y_train, X_test, y_test):
 
         # Log model
         if "xgb" in model_name.lower():
-            mlflow.xgboost.log_model(model, artifact_path="model",
-                                     registered_model_name=f"credit-risk-{model_name}")
+            mlflow.xgboost.log_model(
+                model,
+                artifact_path="model",
+                registered_model_name=f"credit-risk-{model_name}",
+            )
         else:
-            mlflow.sklearn.log_model(model, artifact_path="model",
-                                     registered_model_name=f"credit-risk-{model_name}")
+            mlflow.sklearn.log_model(
+                model,
+                artifact_path="model",
+                registered_model_name=f"credit-risk-{model_name}",
+            )
 
         print(f"\n{'='*50}")
         print(f"Model: {model_name}")
@@ -249,7 +270,10 @@ def run(tune: bool = False, n_trials: int = 50):
     lr_metrics = run_experiment(
         "LogisticRegression",
         train_logistic_regression,
-        X_train, y_train, X_test, y_test,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
     )
 
     if tune:
@@ -265,19 +289,30 @@ def run(tune: bool = False, n_trials: int = 50):
         xgb_metrics = run_experiment(
             "XGBoost",
             train_xgboost,
-            X_train, y_train, X_test, y_test,
+            X_train,
+            y_train,
+            X_test,
+            y_test,
         )
 
-    winner = "XGBoost" if xgb_metrics["roc_auc"] > lr_metrics["roc_auc"] else "LogisticRegression"
+    winner = (
+        "XGBoost"
+        if xgb_metrics["roc_auc"] > lr_metrics["roc_auc"]
+        else "LogisticRegression"
+    )
     print(f"\nBest model by ROC-AUC: {winner}")
     print("Check MLflow UI at http://localhost:5000 for full experiment details.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tune", action="store_true",
-                        help="Run Optuna hyperparameter search for XGBoost")
-    parser.add_argument("--trials", type=int, default=50,
-                        help="Number of Optuna trials (default: 50)")
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        help="Run Optuna hyperparameter search for XGBoost",
+    )
+    parser.add_argument(
+        "--trials", type=int, default=50, help="Number of Optuna trials (default: 50)"
+    )
     args = parser.parse_args()
     run(tune=args.tune, n_trials=args.trials)

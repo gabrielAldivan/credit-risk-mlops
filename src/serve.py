@@ -20,6 +20,7 @@ Docker (add to docker-compose.yml):
 Production (AWS):
   Replace local model fallback with SageMaker endpoint or S3-stored artifact.
 """
+
 from __future__ import annotations
 
 import logging
@@ -28,7 +29,6 @@ import sys
 from typing import List, Optional
 
 import joblib
-import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -45,6 +45,7 @@ RISK_THRESHOLD = float(os.environ.get("RISK_THRESHOLD", "0.5"))
 
 
 # ── Request / Response schemas ────────────────────────────────────────────────
+
 
 class ApplicantFeatures(BaseModel):
     """Raw German Credit dataset fields — same schema as model training input."""
@@ -70,21 +71,38 @@ class ApplicantFeatures(BaseModel):
     telephone: str
     foreign_worker: str
 
-    model_config = {"json_schema_extra": {"example": {
-        "duration": 24, "credit_amount": 5000.0, "installment_rate": 2,
-        "residence_since": 2, "age": 35, "existing_credits": 1,
-        "num_dependents": 1, "checking_account": "A11", "credit_history": "A32",
-        "purpose": "A43", "savings_account": "A61", "employment_since": "A73",
-        "personal_status": "A93", "other_debtors": "A101", "property": "A121",
-        "other_installments": "A143", "housing": "A152", "job": "A173",
-        "telephone": "A192", "foreign_worker": "A201",
-    }}}
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "duration": 24,
+                "credit_amount": 5000.0,
+                "installment_rate": 2,
+                "residence_since": 2,
+                "age": 35,
+                "existing_credits": 1,
+                "num_dependents": 1,
+                "checking_account": "A11",
+                "credit_history": "A32",
+                "purpose": "A43",
+                "savings_account": "A61",
+                "employment_since": "A73",
+                "personal_status": "A93",
+                "other_debtors": "A101",
+                "property": "A121",
+                "other_installments": "A143",
+                "housing": "A152",
+                "job": "A173",
+                "telephone": "A192",
+                "foreign_worker": "A201",
+            }
+        }
+    }
 
 
 class PredictionResponse(BaseModel):
-    risk_label: str             # "good" or "bad"
-    probability_bad: float      # P(default) — higher = riskier
-    risk_score: int             # 0–1000 scorecard; higher = safer applicant
+    risk_label: str  # "good" or "bad"
+    probability_bad: float  # P(default) — higher = riskier
+    risk_score: int  # 0–1000 scorecard; higher = safer applicant
 
 
 class BatchRequest(BaseModel):
@@ -114,9 +132,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
-_model = None          # XGBClassifier
-_scaler = None         # StandardScaler (fitted on training data)
-_feature_columns: Optional[List[str]] = None   # ordered columns from X_train
+_model = None  # XGBClassifier
+_scaler = None  # StandardScaler (fitted on training data)
+_feature_columns: Optional[List[str]] = None  # ordered columns from X_train
 
 
 def _load_artifacts():
@@ -130,12 +148,14 @@ def _load_artifacts():
     try:
         import mlflow.xgboost
         import mlflow
+
         mlflow.set_tracking_uri(MLFLOW_URI)
         _model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}/latest")
         logger.info("Model loaded from MLflow registry: %s", MODEL_NAME)
     except Exception as exc:
         logger.warning("MLflow unavailable (%s). Falling back to local training.", exc)
         from train import train_xgboost, load_data
+
         X_train_df, X_test_df, y_train, y_test = load_data()
         _model, _, _, _, _ = train_xgboost(X_train_df, y_train, X_test_df, y_test)
         logger.info("Fallback model trained locally.")
@@ -148,6 +168,7 @@ def startup_event():
 
 # ── Preprocessing ─────────────────────────────────────────────────────────────
 
+
 def _preprocess(applicant: ApplicantFeatures) -> pd.DataFrame:
     """
     Convert a single applicant to the feature vector used during training.
@@ -158,10 +179,14 @@ def _preprocess(applicant: ApplicantFeatures) -> pd.DataFrame:
     row = pd.DataFrame([applicant.model_dump()])
     row = engineer_features(row)
 
-    df_enc = pd.get_dummies(row, columns=CATEGORICAL_COLS + ["age_group"], drop_first=True)
+    df_enc = pd.get_dummies(
+        row, columns=CATEGORICAL_COLS + ["age_group"], drop_first=True
+    )
     df_enc = df_enc.reindex(columns=_feature_columns, fill_value=0)
 
-    num_present = [c for c in NUMERICAL_COLS + ["credit_per_month"] if c in df_enc.columns]
+    num_present = [
+        c for c in NUMERICAL_COLS + ["credit_per_month"] if c in df_enc.columns
+    ]
     df_enc[num_present] = _scaler.transform(df_enc[num_present])
 
     return df_enc
@@ -180,6 +205,7 @@ def _score(applicant: ApplicantFeatures) -> PredictionResponse:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @app.get("/health", tags=["ops"])
 def health():
